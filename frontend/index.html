@@ -1,0 +1,2824 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>创意画布</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    <!-- 引入Google字体'Inter'以获得更好的视觉效果 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- 基本样式重置 --- */
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            color: #fff;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+
+        @keyframes gradientBG {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        /* --- 画布样式 --- */
+        #drawing-board {
+            display: block;
+            background-color: #ffffff;
+            /* 画布保持白色 */
+            cursor: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'%3e%3c/path%3e%3c/svg%3e") 0 24, crosshair;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+            /* 给画布加个阴影让它浮起来 */
+        }
+
+        /* --- 文本工具样式 --- */
+        .textarea-wrapper {
+            position: absolute;
+            z-index: 10;
+        }
+
+        .dynamic-textarea {
+            border: 1px dashed #007bff;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 5px;
+            font-family: 'Inter', sans-serif;
+            resize: none;
+            outline: none;
+            white-space: pre-wrap;
+            /* Allow wrapping */
+            overflow: hidden;
+            width: 150px;
+            /* Default width */
+        }
+
+        .textarea-controls {
+            position: absolute;
+            bottom: -30px;
+            /* Position below the textarea */
+            right: 0;
+            display: flex;
+            gap: 4px;
+        }
+
+        .textarea-controls button {
+            width: 26px;
+            height: 26px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            color: #333;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 1;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .textarea-controls button:hover {
+            background-color: #f0f0f0;
+        }
+
+
+        /* --- 工具栏容器 --- */
+        .toolbar {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 30, 50, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 12px 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            animation: slide-up 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            z-index: 100;
+        }
+
+        @keyframes slide-up {
+            from {
+                bottom: -100px;
+                opacity: 0;
+            }
+
+            to {
+                bottom: 20px;
+                opacity: 1;
+            }
+        }
+
+        /* --- 工具组样式 --- */
+        .tool-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .tool-group label {
+            font-size: 14px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        /* --- Toast Notification (Redesigned) --- */
+        #status-message {
+            position: fixed;
+            /* Fixed relative to screen */
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 50px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+            font-weight: 600;
+            font-size: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 2100;
+            /* Above modal and everything */
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            opacity: 0;
+            pointer-events: none;
+            /* Let clicks pass through when hidden */
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        #status-message.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
+
+        #status-message.success {
+            border-left: 4px solid #00bfa5;
+            color: #00796b;
+            background: #ffffff;
+        }
+
+        #status-message.success::before {
+            content: '✓';
+            background: #00bfa5;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        #status-message.error {
+            border-left: 4px solid #dc3545;
+            color: #d32f2f;
+            background: #ffffff;
+        }
+
+        #status-message.error::before {
+            content: '!';
+            background: #dc3545;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* --- 工具按钮 (通用) --- */
+        /* --- 工具按钮 (通用) --- */
+        .tool-btn {
+            width: 44px;
+            height: 44px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(4px);
+        }
+
+        .tool-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            color: #fff;
+        }
+
+        .tool-btn.active {
+            background: linear-gradient(135deg, #8c52ff, #00f3ff);
+            border-color: transparent;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(140, 82, 255, 0.5);
+        }
+
+        .tool-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.3;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* --- 确认按钮 --- */
+        /* --- 确认按钮 --- */
+        #confirm-btn {
+            background: linear-gradient(135deg, #8c52ff, #5e17eb);
+            color: white;
+            border: none;
+            width: auto;
+            padding: 0 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(94, 23, 235, 0.4);
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0% {
+                box-shadow: 0 0 0 0 rgba(140, 82, 255, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(140, 82, 255, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(140, 82, 255, 0);
+            }
+        }
+
+        #confirm-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(94, 23, 235, 0.6);
+            filter: brightness(1.1);
+        }
+
+        .divider {
+            width: 1px;
+            height: 24px;
+            background-color: #e0e0e0;
+            border-radius: 1px;
+        }
+
+        /* --- 颜色选择器 --- */
+        #color-picker {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border: none;
+            background-color: transparent;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        #color-picker:hover {
+            transform: scale(1.1);
+        }
+
+        #color-picker::-webkit-color-swatch {
+            border-radius: 50%;
+            border: 2px solid #e0e0e0;
+        }
+
+        #color-picker::-moz-color-swatch {
+            border-radius: 50%;
+            border: 2px solid #e0e0e0;
+        }
+
+        /* --- 画笔粗细滑块 --- */
+        #brush-size {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 150px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        #brush-size::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            transition: transform 0.2s;
+        }
+
+        #brush-size::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        #brush-size::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            transition: transform 0.2s;
+            border: none;
+        }
+
+        /* --- 粗细值显示 --- */
+        #brush-size-value {
+            font-weight: 500;
+            font-size: 14px;
+            min-width: 28px;
+            text-align: right;
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tool-select {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 0 12px;
+            height: 44px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            color: #fff;
+            cursor: pointer;
+            outline: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+            padding-right: 36px;
+            backdrop-filter: blur(4px);
+            transition: all 0.2s;
+        }
+
+        .tool-select:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        option {
+            background-color: #1e1e32;
+            color: white;
+        }
+
+        /* --- 截图模态窗口 (Redesigned) --- */
+        #image-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        #image-modal.show {
+            display: flex;
+            animation: fade-in 0.3s ease-out forwards;
+        }
+
+        #image-modal.show #modal-content {
+            animation: spring-scale-up 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes spring-scale-up {
+            0% {
+                opacity: 0;
+                transform: scale(0.8) translateY(20px);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        #modal-content {
+            position: relative;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+            width: 90vw;
+            max-width: 1100px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(20px);
+            color: #333;
+        }
+
+        /* --- Analysis Card --- */
+        .analysis-card {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 16px;
+            padding: 24px;
+            border-left: 4px solid #00f3ff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .analysis-content h3 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            color: #007bff;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .analysis-content p {
+            margin: 0 0 20px 0;
+            font-size: 16px;
+            color: #555;
+            line-height: 1.7;
+        }
+
+        .analysis-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* --- Comparison View --- */
+        .comparison-container {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 20px;
+            align-items: stretch;
+            min-height: 300px;
+        }
+
+        .image-wrapper {
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+
+        .image-wrapper:hover {
+            transform: translateY(-5px);
+            border-color: rgba(0, 0, 0, 0.1);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .image-wrapper h4 {
+            margin: 0;
+            font-size: 15px;
+            color: #555;
+            font-weight: 600;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .image-box {
+            width: 100%;
+            height: 100%;
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.03);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            border: 2px dashed rgba(0, 0, 0, 0.1);
+        }
+
+        .image-box img,
+        .image-box video {
+            max-width: 100%;
+            max-height: 400px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* --- Video Result Area --- */
+        #video-result-area {
+            width: 100%;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #video-result-area .image-wrapper {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #video-container {
+            width: 100%;
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.03);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px dashed rgba(0, 0, 0, 0.1);
+        }
+
+        #video-container video {
+            max-width: 100%;
+            max-height: 400px;
+            width: auto;
+            height: auto;
+        }
+
+        .comparison-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ccc;
+        }
+
+        /* --- Action Bar --- */
+        .modal-action-bar {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            margin-top: auto;
+        }
+
+        .modal-action-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.05);
+            color: #333;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .modal-action-btn:hover {
+            transform: translateY(-2px);
+            background: rgba(0, 0, 0, 0.1);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        #try-again-btn {
+            background: #f8f9fa;
+            color: #555;
+            border: 1px solid #e9ecef;
+        }
+
+        #try-again-btn:hover {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        #image-btn {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+
+        #image-btn:hover {
+            box-shadow: 0 0 30px rgba(255, 193, 7, 0.6);
+            border-color: #ffc107;
+        }
+
+        #video-btn {
+            background: linear-gradient(135deg, #28a745, #218838);
+            color: white;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+            border: none;
+        }
+
+        #video-btn:hover {
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+            transform: translateY(-2px);
+        }
+
+        #save-btn {
+            background: linear-gradient(135deg, #ffc107, #e0a800);
+            color: #333;
+            box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+            border: none;
+        }
+
+        #save-btn:hover {
+            box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* --- Supplementary Notes Textarea --- */
+        #supplementary-notes {
+            margin-top: 10px;
+        }
+
+        #supplementary-notes-textarea,
+        #video-supplementary-notes-textarea {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            min-height: 80px;
+            resize: vertical;
+            background-color: rgba(255, 255, 255, 0.8);
+            color: #333;
+            transition: all 0.3s;
+        }
+
+        #supplementary-notes-textarea::placeholder,
+        #video-supplementary-notes-textarea::placeholder {
+            color: rgba(0, 0, 0, 0.5);
+        }
+
+        #supplementary-notes-textarea:focus,
+        #video-supplementary-notes-textarea:focus {
+            border-color: #00f3ff;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+            background-color: #fff;
+            outline: none;
+        }
+
+        /* --- Responsive Adjustments --- */
+        @media (max-width: 768px) {
+            .comparison-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+            }
+
+            .comparison-arrow {
+                transform: rotate(90deg);
+                padding: 10px;
+            }
+        }
+
+
+
+        #close-modal-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 32px;
+            height: 32px;
+            background: #f1f3f5;
+            border: none;
+            border-radius: 50%;
+            font-size: 20px;
+            font-weight: bold;
+            color: #555;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+            z-index: 10;
+            /* Ensure it's on top */
+        }
+
+        #close-modal-btn:hover {
+            transform: scale(1.1) rotate(90deg);
+            background: #e9ecef;
+            color: #000;
+        }
+
+        .loader {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            position: relative;
+            animation: rotate 1s linear infinite;
+        }
+
+        .loader::before {
+            content: "";
+            box-sizing: border-box;
+            position: absolute;
+            inset: 0px;
+            border-radius: 50%;
+            border: 3px solid #FFF;
+            animation: prixClipFix 2s linear infinite;
+        }
+
+        .loader::after {
+            content: "";
+            border-radius: 50%;
+            position: absolute;
+            inset: 0px;
+            border: 3px solid rgba(140, 82, 255, 0.5);
+            animation: rotate 0.5s linear infinite reverse;
+        }
+
+        @keyframes rotate {
+            0% {
+                transform: rotate(0deg)
+            }
+
+            100% {
+                transform: rotate(360deg)
+            }
+        }
+
+        @keyframes prixClipFix {
+            0% {
+                clip-path: polygon(50% 50%, 0 0, 0 0, 0 0, 0 0, 0 0)
+            }
+
+            25% {
+                clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 0, 100% 0, 100% 0)
+            }
+
+            50% {
+                clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 100% 100%, 100% 100%)
+            }
+
+            75% {
+                clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 100%)
+            }
+
+            100% {
+                clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 0)
+            }
+        }
+
+
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes scale-up {
+            from {
+                transform: scale(0.9);
+                opacity: 0.5;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* --- User Profile --- */
+        #user-profile {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1001;
+            cursor: pointer;
+        }
+
+        #user-icon {
+            width: 30px;
+            height: 30px;
+            padding: 8px;
+            border-radius: 50%;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            color: #333;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            z-index: 2001;
+            /* Ensure higher z-index */
+        }
+
+        #user-icon:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        #user-info-popup {
+            display: none;
+            position: absolute;
+            top: 60px;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            width: 260px;
+            font-size: 14px;
+            color: #333;
+            backdrop-filter: blur(12px);
+            z-index: 2005;
+        }
+
+        #user-info-popup p {
+            margin: 0 0 12px 0;
+            word-wrap: break-word;
+            color: #555;
+        }
+
+        #logout-btn,
+        #login-btn,
+        #creations-btn {
+            width: 100%;
+            margin-top: 10px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            color: #333;
+            text-align: center;
+        }
+
+        #logout-btn:hover,
+        #creations-btn:hover,
+        #login-btn:hover {
+            background: rgba(0, 0, 0, 0.1);
+            border-color: rgba(0, 0, 0, 0.2);
+            transform: translateY(-1px);
+        }
+
+        #creations-btn {
+            background: linear-gradient(135deg, rgba(140, 82, 255, 0.2), rgba(0, 243, 255, 0.2));
+            border-color: rgba(140, 82, 255, 0.4);
+        }
+
+        #creations-btn:hover {
+            box-shadow: 0 0 20px rgba(140, 82, 255, 0.3);
+        }
+
+        /* --- Creations Modal --- */
+        #creations-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            backdrop-filter: blur(10px);
+        }
+
+        #creations-modal.show {
+            display: flex;
+            animation: fade-in 0.3s ease-out forwards;
+        }
+
+        #creations-modal-content {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            color: #333;
+            padding: 30px;
+            border-radius: 24px;
+            width: 90vw;
+            max-width: 1200px;
+            height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.15);
+        }
+
+        #creations-toolbar {
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .creations-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .creation-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .creation-actions label {
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        #delete-creations-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #delete-creations-btn:hover {
+            background-color: #c82333;
+        }
+
+        #delete-creations-btn:disabled {
+            background-color: #e9ecef;
+            cursor: not-allowed;
+        }
+
+        #creations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .creation-item {
+            position: relative;
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .creation-item .selection-checkbox {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 20px;
+            height: 20px;
+        }
+
+        .creation-item img {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .creation-item p {
+            margin: 0;
+            font-size: 12px;
+            color: #555;
+            word-break: break-all;
+        }
+
+        #close-creations-modal-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 32px;
+            height: 32px;
+            background: #f1f3f5;
+            border: none;
+            border-radius: 50%;
+            font-size: 20px;
+            font-weight: bold;
+            color: #555;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+            z-index: 10;
+            /* Ensure it's on top */
+        }
+
+        #close-creations-modal-btn:hover {
+            transform: scale(1.1) rotate(90deg);
+            background: #e9ecef;
+            color: #000;
+        }
+
+        #logo {
+            position: fixed;
+            top: 25px;
+            left: 30px;
+            height: 80px;
+            z-index: 1001;
+            opacity: 0.8;
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        #logo:hover {
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            .toolbar {
+                width: 90vw;
+                padding: 10px;
+                gap: 8px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .tool-group {
+                gap: 8px;
+            }
+
+            #brush-size {
+                width: 100px;
+                /* Reduce slider width */
+            }
+
+            .tool-btn {
+                width: 36px;
+                height: 36px;
+            }
+
+            #confirm-btn {
+                padding: 0 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .toolbar {
+                padding: 8px;
+                gap: 5px;
+            }
+
+            .tool-group label {
+                display: none;
+                /* Hide labels to save space */
+            }
+
+            #brush-size {
+                width: 80px;
+            }
+
+            .tool-select {
+                padding: 0 8px;
+                padding-right: 28px;
+                /* Keep space for arrow */
+            }
+        }
+
+
+        .model-selection-group {
+            margin-bottom: 10px;
+        }
+
+        .model-selection-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 4px;
+        }
+
+        .model-select {
+            width: 100%;
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 13px;
+        }
+
+        /* --- Lightbox --- */
+        #lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            backdrop-filter: blur(5px);
+        }
+
+        #lightbox img,
+        #lightbox video {
+            max-width: 95%;
+            max-height: 95%;
+            object-fit: contain;
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            z-index: 3001;
+            background: rgba(0, 0, 0, 0.5);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        #lightbox-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+
+<body>
+    <img id="logo" src="logo.png" alt="Logo">
+
+    <div id="user-profile">
+        <svg id="user-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        <div id="user-info-popup">
+            <p><strong>Email:</strong> <span id="user-email">guest@example.com</span></p>
+            <p><strong>User ID:</strong> <span id="user-id">guest</span></p>
+
+            <div class="model-selection-group">
+                <label for="image-model-select">Image Model</label>
+                <select id="image-model-select" class="model-select">
+                    <option value="gemini-3-pro-image-preview" selected>gemini-3-pro-image-preview</option>
+                    <option value="gemini-2.5-flash-image">gemini-2.5-flash-image</option>
+                </select>
+            </div>
+            <div class="model-selection-group">
+                <label for="video-model-select">Video Model</label>
+                <select id="video-model-select" class="model-select">
+                    <option value="veo-3.1-generate-001" selected>veo-3.1-generate-001</option>
+                    <option value="veo-3.1-fast-generate-001">veo-3.1-fast-generate-001</option>
+                </select>
+            </div>
+            <div class="divider" style="width: 100%; height: 1px; margin: 10px 0;"></div>
+
+            <button id="creations-btn">查看我的创作</button>
+            <button id="logout-btn" style="display: none;">退出登录</button>
+            <button id="login-btn">登录</button>
+        </div>
+    </div>
+
+    <canvas id="drawing-board"></canvas>
+    <div id="text-input-container"></div>
+
+    <!-- Creations Modal -->
+    <div id="creations-modal">
+        <div id="creations-modal-content">
+            <div id="creations-toolbar">
+                <div class="creations-header">
+                    <h2>My Creations</h2>
+                    <div class="creation-actions">
+                        <label>
+                            <input type="checkbox" id="select-all-creations"> Select All
+                        </label>
+                        <button id="delete-creations-btn" disabled>Delete Selected</button>
+                    </div>
+                </div>
+            </div>
+            <div id="creations-grid">
+                <!-- Creations will be loaded here -->
+            </div>
+            <button id="close-creations-modal-btn">&times;</button>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <button id="undo-btn" class="tool-btn" title="Back">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 14 4 9 9 4"></polyline>
+                <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+            </svg>
+        </button>
+        <button id="clear-btn" class="tool-btn" title="Clear">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+        </button>
+        <button id="upload-btn" class="tool-btn" title="Upload Image">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+        </button>
+        <div class="divider"></div>
+        <button id="pen-btn" class="tool-btn active" title="Pen (Draw)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+            </svg>
+        </button>
+        <button id="eraser-btn" class="tool-btn" title="Eraser">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z">
+                </path>
+                <path d="m5 12 5 5"></path>
+            </svg>
+        </button>
+        <button id="text-btn" class="tool-btn" title="Text">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                <line x1="9" y1="20" x2="15" y2="20"></line>
+                <line x1="12" y1="4" x2="12" y2="20"></line>
+            </svg>
+        </button>
+        <button id="pan-btn" class="tool-btn" title="Pan">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"></path>
+                <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"></path>
+                <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"></path>
+                <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-4a4 4 0 0 1-4-4 4 4 0 0 1 4-4h8Z"></path>
+            </svg>
+        </button>
+        <div class="tool-group">
+            <label for="color-picker">Color</label>
+            <input type="color" id="color-picker" value="#1a1a1a">
+        </div>
+        <div class="tool-group">
+            <label for="brush-size">Size</label>
+            <input type="range" id="brush-size" min="1" max="100" value="5">
+            <span id="brush-size-value">5px</span>
+        </div>
+        <div class="divider"></div>
+        <div class="tool-group">
+            <label for="style-select">Style</label>
+            <select id="style-select" class="tool-select">
+                <option value="auto">Auto</option>
+                <option value="photorealistic">写实(Photorealistic)</option>
+                <option value="anime">动漫(Anime)</option>
+                <option value="oil-painting">油画(Oil Painting)</option>
+                <option value="cyberpunk">赛博朋克(Cyberpunk)</option>
+                <option value="cinematic-film">电影胶片(Cinematic Film)</option>
+                <option value="pixel-art">像素艺术(Pixel Art)</option>
+            </select>
+        </div>
+        <button id="confirm-btn" class="tool-btn" title="Confirm and Analyze">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3L9.5 8.5L4 11l5.5 2.5L12 19l2.5-5.5L20 11l-5.5-2.5z"></path>
+            </svg>
+            <span>Go</span>
+        </button>
+    </div>
+
+    <!-- 截图展示模态窗口 (Redesigned) -->
+    <div id="image-modal">
+        <div id="modal-content">
+            <!-- 1. Analysis Section -->
+            <div id="ai-results" class="analysis-card">
+                <div id="description-style-container" class="analysis-content">
+                    <!-- AI-generated description and style will be inserted here -->
+                </div>
+                <div id="supplementary-notes" style="display: none;">
+                    <textarea id="supplementary-notes-textarea" placeholder="想调整画面？在这里输入补充说明..."></textarea>
+                </div>
+            </div>
+
+            <!-- 2. Comparison Section -->
+            <div class="comparison-container">
+                <div class="image-wrapper">
+                    <h4>原始草图</h4>
+                    <div class="image-box">
+                        <img id="screenshot-image" src="" alt="Original Drawing">
+                    </div>
+                </div>
+
+                <div class="comparison-arrow">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14"></path>
+                        <path d="m12 5 7 7-7 7"></path>
+                    </svg>
+                </div>
+
+                <div class="image-wrapper">
+                    <h4>生成结果</h4>
+                    <div class="image-box" id="generated-content">
+                        <img id="gemini-image" src="" alt="Gemini Generated Image" style="display: none;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2.5 Video Result Section (New) -->
+            <div id="video-result-area">
+                <div class="image-wrapper">
+                    <h4>生成视频</h4>
+                    <div id="video-container"></div>
+                </div>
+            </div>
+
+            <!-- Video Supplementary Notes (Moved here) -->
+            <div id="video-supplementary-notes" style="display: none; margin: 10px 0;">
+                <textarea id="video-supplementary-notes-textarea" placeholder="想调整视频？在这里输入补充说明..."></textarea>
+            </div>
+
+            <!-- 3. Action Bar -->
+            <div class="modal-action-bar">
+                <button id="try-again-btn" class="modal-action-btn" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                        <path d="M3 3v5h5"></path>
+                        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+                        <path d="M16 16l5 5v-5"></path>
+                    </svg>
+                    重新理解绘图
+                </button>
+                <button id="image-btn" class="modal-action-btn" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    生成图片
+                </button>
+                <button id="video-btn" class="modal-action-btn" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                    </svg>
+                    生成视频
+                </button>
+                <button id="save-btn" class="modal-action-btn" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                        <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    保存创作
+                </button>
+            </div>
+            <button id="close-modal-btn">&times;</button>
+        </div>
+    </div>
+
+    <!-- Toast is now fixed positioned, but we keep it here in DOM or move to body if needed. 
+                 Since it's fixed, DOM position matters less for layout, but for z-index stacking context 
+                 inside modal it might be tricky if modal has overflow hidden. 
+                 Let's move it OUTSIDE the modal content if possible, or ensure modal-content allows overflow. 
+                 Actually, fixed position is relative to viewport, so it ignores parent overflow usually 
+                 unless parent has transform. #modal-content has relative position... 
+                 Wait, #image-modal is fixed. #modal-content is relative. 
+                 If #status-message is inside #modal-content, fixed position MIGHT interpret viewport 
+                 BUT if #modal-content had transform it would be relative to that. 
+                 Safe bet: Move #status-message to <body> or ensure no interference.
+                 However, user wants it to work. Let's keep it simple. -->
+    <div id="status-message"></div>
+
+    <!-- Lightbox -->
+    <div id="lightbox">
+        <div id="lightbox-close">&times;</div>
+        <div id="lightbox-content"></div>
+    </div>
+
+    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+    <path d="M3 3v5h5"></path>
+    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+    <path d="M16 16l5 5v-5"></path>
+    </svg>
+    理解绘图
+    </button>
+    <button id="image-btn" class="modal-action-btn" style="display: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+        生成图片
+    </button>
+    <button id="video-btn" class="modal-action-btn" style="display: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+        </svg>
+        生成视频
+    </button>
+    <button id="save-btn" class="modal-action-btn" style="display: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+            <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+        保存创作
+    </button>
+    </div>
+    <button id="close-modal-btn">&times;</button>
+    </div>
+    </div>
+
+    <!-- Hidden File Input for Image Upload -->
+    <input type="file" id="image-upload-input" accept="image/*" style="display: none;">
+
+    <script>
+        window.addEventListener('load', () => {
+            const canvas = document.getElementById('drawing-board');
+            const ctx = canvas.getContext('2d');
+            const textInputContainer = document.getElementById('text-input-container');
+
+
+            const colorPicker = document.getElementById('color-picker');
+            const brushSizeSlider = document.getElementById('brush-size');
+            const brushSizeValue = document.getElementById('brush-size-value');
+            const penBtn = document.getElementById('pen-btn'); // Add pen button
+            const eraserBtn = document.getElementById('eraser-btn');
+            const textBtn = document.getElementById('text-btn');
+            const panBtn = document.getElementById('pan-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const undoBtn = document.getElementById('undo-btn');
+            const uploadBtn = document.getElementById('upload-btn');
+            const imageUploadInput = document.getElementById('image-upload-input');
+            const confirmBtn = document.getElementById('confirm-btn');
+            const imageModal = document.getElementById('image-modal');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            const screenshotImage = document.getElementById('screenshot-image');
+            let geminiImage = document.getElementById('gemini-image');
+            const aiResultsContainer = document.getElementById('ai-results');
+            const tryAgainBtn = document.getElementById('try-again-btn');
+            const imageBtn = document.getElementById('image-btn');
+            const videoBtn = document.getElementById('video-btn');
+            const saveBtn = document.getElementById('save-btn');
+            const statusMessage = document.getElementById('status-message');
+
+            function showToast(message, type = 'success') {
+                statusMessage.textContent = message;
+                statusMessage.className = ''; // remove all previous classes
+                // force Reflow
+                void statusMessage.offsetWidth;
+
+                statusMessage.classList.add(type, 'show');
+
+                // Auto hide after 3 seconds
+                setTimeout(() => {
+                    statusMessage.classList.remove('show');
+                }, 3000);
+            }
+
+            // --- User Info Elements ---
+            const userProfile = document.getElementById('user-profile');
+            const userIcon = document.getElementById('user-icon');
+            const userInfoPopup = document.getElementById('user-info-popup');
+            const userEmailSpan = document.getElementById('user-email');
+            const userIdSpan = document.getElementById('user-id');
+            const logoutBtn = document.getElementById('logout-btn');
+            const loginBtn = document.getElementById('login-btn');
+            const creationsBtn = document.getElementById('creations-btn');
+            const creationsModal = document.getElementById('creations-modal');
+            const closeCreationsModalBtn = document.getElementById('close-creations-modal-btn');
+            const creationsGrid = document.getElementById('creations-grid');
+            const deleteCreationsBtn = document.getElementById('delete-creations-btn');
+            const selectAllCheckbox = document.getElementById('select-all-creations');
+
+            // --- Model Selection Logic ---
+            const imageModelSelect = document.getElementById('image-model-select');
+            const videoModelSelect = document.getElementById('video-model-select');
+
+            // Load saved models
+            const savedImageModel = localStorage.getItem('imageModel');
+            if (savedImageModel) imageModelSelect.value = savedImageModel;
+
+            const savedVideoModel = localStorage.getItem('videoModel');
+            if (savedVideoModel) videoModelSelect.value = savedVideoModel;
+
+            // Save on change
+            imageModelSelect.addEventListener('change', () => {
+                localStorage.setItem('imageModel', imageModelSelect.value);
+            });
+            videoModelSelect.addEventListener('change', () => {
+                localStorage.setItem('videoModel', videoModelSelect.value);
+            });
+
+            // --- State Variables ---
+            let isDrawing = false;
+            let isPanning = false;
+            let currentMode = 'draw';
+            let drawingHistory = [];
+            let currentPath = [];
+            let lastImageBytes = null;
+            let lastGeneratedImageBytes = null;
+            let activeTextareaWrapper = null;
+            let lastImagePrompt = null;
+            let lastVideoPrompt = null;
+            let lastCreationId = null;
+            let lastCnDescription = null;
+            let lastCnStyle = null;
+
+            // Transformation state
+            let scale = 1.0;
+            let offsetX = 0;
+            let offsetY = 0;
+            let lastPinchDist = null;
+            let lastPanPoint = null;
+
+
+            // --- Helper Functions ---
+            function getTransformedPoint(x, y) {
+                return {
+                    x: (x - offsetX) / scale,
+                    y: (y - offsetY) / scale
+                };
+            }
+
+            function updateUndoButton() {
+                undoBtn.disabled = drawingHistory.length === 0;
+            }
+
+            function drawHistoryOnContext(targetCtx, history) {
+                history.forEach(item => {
+                    if (item.type === 'image') {
+                        targetCtx.drawImage(item.image, item.x, item.y, item.width, item.height);
+                    } else if (item.type === 'text') {
+                        targetCtx.fillStyle = item.color;
+                        targetCtx.font = `${item.size}px Inter`;
+                        targetCtx.textAlign = 'left';
+                        targetCtx.textBaseline = 'top';
+                        const lines = item.text.split('\n');
+                        lines.forEach((line, index) => {
+                            targetCtx.fillText(line, item.x, item.y + (index * item.size * 1.2));
+                        });
+                    } else { // It's a stroke
+                        const stroke = item;
+                        targetCtx.strokeStyle = (stroke.mode === 'erase') ? '#ffffff' : stroke.color;
+                        targetCtx.lineWidth = stroke.size;
+                        targetCtx.lineCap = 'round';
+                        targetCtx.lineJoin = 'round';
+                        targetCtx.beginPath();
+                        if (stroke.path.length > 0) {
+                            targetCtx.moveTo(stroke.path[0].x, stroke.path[0].y);
+                            for (let i = 1; i < stroke.path.length; i++) {
+                                targetCtx.lineTo(stroke.path[i].x, stroke.path[i].y);
+                            }
+                            targetCtx.stroke();
+                        }
+                    }
+                });
+            }
+
+            // --- Core Drawing Function ---
+            function redrawCanvas() {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+
+                ctx.save();
+                ctx.translate(offsetX, offsetY);
+                ctx.scale(scale, scale);
+
+                drawHistoryOnContext(ctx, drawingHistory);
+
+                if (currentPath.length > 1) {
+                    ctx.strokeStyle = (currentMode === 'erase') ? '#ffffff' : colorPicker.value;
+                    ctx.lineWidth = brushSizeSlider.value;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(currentPath[0].x, currentPath[0].y);
+                    for (let i = 1; i < currentPath.length; i++) {
+                        ctx.lineTo(currentPath[i].x, currentPath[i].y);
+                    }
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            function getDrawingBounds() {
+                if (drawingHistory.length === 0) {
+                    return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
+                }
+
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+                const tempCtx = document.createElement('canvas').getContext('2d');
+
+
+                drawingHistory.forEach(item => {
+                    if (item.type === 'image') {
+                        minX = Math.min(minX, item.x);
+                        minY = Math.min(minY, item.y);
+                        maxX = Math.max(maxX, item.x + item.width);
+                        maxY = Math.max(maxY, item.y + item.height);
+                    } else if (item.type === 'text') {
+                        tempCtx.font = `${item.size}px Inter`;
+                        const lines = item.text.split('\n');
+                        const textHeight = lines.length * item.size * 1.2;
+                        const textWidth = Math.max(...lines.map(line => tempCtx.measureText(line).width));
+
+                        minX = Math.min(minX, item.x);
+                        minY = Math.min(minY, item.y);
+                        maxX = Math.max(maxX, item.x + textWidth);
+                        maxY = Math.max(maxY, item.y + textHeight);
+                    } else { // stroke
+                        const padding = item.size / 2;
+                        item.path.forEach(point => {
+                            minX = Math.min(minX, point.x - padding);
+                            minY = Math.min(minY, point.y - padding);
+                            maxX = Math.max(maxX, point.x + padding);
+                            maxY = Math.max(maxY, point.y + padding);
+                        });
+                    }
+                });
+
+                if (!isFinite(minX)) {
+                    return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
+                }
+
+                return {
+                    minX, minY, maxX, maxY,
+                    width: maxX - minX,
+                    height: maxY - minY
+                };
+            }
+
+            // --- Text Tool Implementation ---
+            function finalizeActiveTextarea() {
+                if (!activeTextareaWrapper) return;
+
+                const wrapperToRemove = activeTextareaWrapper;
+                const textarea = wrapperToRemove.querySelector('textarea');
+
+                activeTextareaWrapper = null;
+
+                if (!textarea) return;
+
+                textarea.removeEventListener('blur', finalizeActiveTextarea);
+
+                const text = textarea.value.trim();
+                if (text) {
+                    drawingHistory.push({
+                        type: 'text',
+                        text: text,
+                        x: parseFloat(textarea.dataset.x),
+                        y: parseFloat(textarea.dataset.y),
+                        color: textarea.dataset.color,
+                        size: parseFloat(textarea.dataset.size)
+                    });
+                    updateUndoButton();
+                }
+
+                if (textInputContainer.contains(wrapperToRemove)) {
+                    textInputContainer.removeChild(wrapperToRemove);
+                }
+
+                redrawCanvas();
+            }
+
+            function createTextarea(screenX, screenY) {
+                finalizeActiveTextarea();
+
+                const point = getTransformedPoint(screenX, screenY);
+                const size = parseFloat(brushSizeSlider.value);
+                const color = colorPicker.value;
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'textarea-wrapper';
+                wrapper.style.left = `${screenX}px`;
+                wrapper.style.top = `${screenY}px`;
+
+                wrapper.addEventListener('mousedown', (e) => e.stopPropagation());
+
+
+                const textarea = document.createElement('textarea');
+                textarea.className = 'dynamic-textarea';
+                textarea.style.fontSize = `${size}px`;
+                textarea.style.lineHeight = `${size * 1.2}px`;
+                textarea.style.color = color;
+                textarea.dataset.x = point.x;
+                textarea.dataset.y = point.y;
+                textarea.dataset.color = color;
+                textarea.dataset.size = size;
+
+                const controls = document.createElement('div');
+                controls.className = 'textarea-controls';
+
+                controls.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                });
+
+                const incBtn = document.createElement('button');
+                incBtn.textContent = '+';
+                incBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    let currentSize = parseFloat(textarea.dataset.size);
+                    let newSize = Math.min(150, currentSize + 2);
+                    textarea.dataset.size = newSize;
+                    textarea.style.fontSize = `${newSize}px`;
+                    textarea.style.lineHeight = `${newSize * 1.2}px`;
+                    textarea.style.height = 'auto';
+                    textarea.style.height = `${textarea.scrollHeight}px`;
+                };
+
+                const decBtn = document.createElement('button');
+                decBtn.textContent = '-';
+                decBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    let currentSize = parseFloat(textarea.dataset.size);
+                    let newSize = Math.max(8, currentSize - 2);
+                    textarea.dataset.size = newSize;
+                    textarea.style.fontSize = `${newSize}px`;
+                    textarea.style.lineHeight = `${newSize * 1.2}px`;
+                    textarea.style.height = 'auto';
+                    textarea.style.height = `${textarea.scrollHeight}px`;
+                };
+
+                controls.appendChild(decBtn);
+                controls.appendChild(incBtn);
+                wrapper.appendChild(textarea);
+                wrapper.appendChild(controls);
+
+                activeTextareaWrapper = wrapper;
+                textInputContainer.appendChild(wrapper);
+                textarea.focus();
+                textarea.style.height = `${textarea.scrollHeight}px`;
+
+                textarea.addEventListener('blur', finalizeActiveTextarea);
+                textarea.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        finalizeActiveTextarea();
+                    }
+                });
+
+                textarea.addEventListener('input', () => {
+                    textarea.style.height = 'auto';
+                    textarea.style.height = `${textarea.scrollHeight}px`;
+                });
+            }
+
+
+            // --- Event Listeners ---
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                redrawCanvas();
+            }
+            window.addEventListener('resize', resizeCanvas);
+
+            function getEventCoordinates(e) {
+                if (e.touches && e.touches[0]) {
+                    const rect = canvas.getBoundingClientRect();
+                    return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+                }
+                return { x: e.offsetX, y: e.offsetY };
+            }
+
+            function handleStart(e) {
+                e.preventDefault();
+                if (e.touches && e.touches.length >= 2) {
+                    const t1 = e.touches[0];
+                    const t2 = e.touches[1];
+                    lastPinchDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+                    lastPanPoint = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+                    isDrawing = false;
+                } else if (currentMode === 'pan') {
+                    isPanning = true;
+                    if (e.touches) {
+                        lastPanPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    } else {
+                        lastPanPoint = { x: e.clientX, y: e.clientY };
+                    }
+                    canvas.style.cursor = 'grabbing';
+                }
+                else {
+                    const { x, y } = getEventCoordinates(e);
+                    if (currentMode === 'text' && (e.type === 'mousedown' ? e.button === 0 : true)) {
+                        createTextarea(x, y);
+                    } else if (e.type === 'mousedown' ? e.button === 0 : true) {
+                        finalizeActiveTextarea();
+                        isDrawing = true;
+                        const point = getTransformedPoint(x, y);
+                        currentPath = [point];
+                    }
+                }
+            }
+
+            function handleMove(e) {
+                e.preventDefault();
+                if (e.touches && e.touches.length >= 2) {
+                    const t1 = e.touches[0];
+                    const t2 = e.touches[1];
+                    const currentPinchDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+                    const currentPanPoint = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+
+                    // Zoom
+                    if (lastPinchDist !== null) {
+                        const zoomFactor = currentPinchDist / lastPinchDist;
+                        const newScale = Math.min(Math.max(0.1, scale * zoomFactor), 20);
+                        const pointX = (currentPanPoint.x - offsetX) / scale;
+                        const pointY = (currentPanPoint.y - offsetY) / scale;
+                        offsetX = currentPanPoint.x - pointX * newScale;
+                        offsetY = currentPanPoint.y - pointY * newScale;
+                        scale = newScale;
+                    }
+
+                    // Pan
+                    if (lastPanPoint !== null) {
+                        offsetX += currentPanPoint.x - lastPanPoint.x;
+                        offsetY += currentPanPoint.y - lastPanPoint.y;
+                    }
+
+                    lastPinchDist = currentPinchDist;
+                    lastPanPoint = currentPanPoint;
+                    redrawCanvas();
+
+                } else if (isPanning) {
+                    if (!lastPanPoint) return;
+                    const currentPoint = e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+                    offsetX += currentPoint.x - lastPanPoint.x;
+                    offsetY += currentPoint.y - lastPanPoint.y;
+                    lastPanPoint = currentPoint;
+                    redrawCanvas();
+                } else if (isDrawing) {
+                    const { x, y } = getEventCoordinates(e);
+                    const point = getTransformedPoint(x, y);
+                    currentPath.push(point);
+                    redrawCanvas();
+                }
+            }
+
+            function handleEnd(e) {
+                lastPinchDist = null;
+                lastPanPoint = null;
+                if (isPanning) {
+                    isPanning = false;
+                    canvas.style.cursor = 'grab';
+                }
+                if (isDrawing) {
+                    isDrawing = false;
+                    if (currentPath.length > 1) {
+                        drawingHistory.push({
+                            path: [...currentPath],
+                            color: colorPicker.value,
+                            size: brushSizeSlider.value,
+                            mode: currentMode
+                        });
+                        currentPath = [];
+                        redrawCanvas();
+                        updateUndoButton();
+                    } else {
+                        currentPath = [];
+                    }
+                }
+            }
+
+            // Mouse event listeners
+            canvas.addEventListener('mousedown', handleStart);
+            canvas.addEventListener('mousemove', handleMove);
+            canvas.addEventListener('mouseup', handleEnd);
+            canvas.addEventListener('mouseout', handleEnd);
+
+            // Touch event listeners
+            canvas.addEventListener('touchstart', handleStart);
+            canvas.addEventListener('touchmove', handleMove);
+            canvas.addEventListener('touchend', handleEnd);
+            canvas.addEventListener('touchcancel', handleEnd);
+
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                finalizeActiveTextarea();
+                const zoomIntensity = 0.1;
+                const wheel = e.deltaY < 0 ? 1 : -1;
+                const zoom = Math.exp(wheel * zoomIntensity);
+                const newScale = Math.min(Math.max(0.1, scale * zoom), 20);
+
+                const mouseX = e.offsetX;
+                const mouseY = e.offsetY;
+
+                const pointX = (mouseX - offsetX) / scale;
+                const pointY = (mouseY - offsetY) / scale;
+
+                offsetX = mouseX - pointX * newScale;
+                offsetY = mouseY - pointY * newScale;
+
+                scale = newScale;
+                redrawCanvas();
+            });
+
+            brushSizeSlider.addEventListener('input', (e) => {
+                brushSizeValue.textContent = `${e.target.value}px`;
+            });
+
+            function setActiveTool(tool) {
+                finalizeActiveTextarea();
+
+                // If the clicked tool is already active, toggle it off (back to draw mode)
+                if (currentMode === tool) {
+                    currentMode = 'draw';
+                } else {
+                    currentMode = tool;
+                }
+
+                // Update UI based on the new mode
+                // Update UI based on the new mode
+                penBtn.classList.remove('active'); // Remove active from pen
+                eraserBtn.classList.remove('active');
+                textBtn.classList.remove('active');
+                panBtn.classList.remove('active');
+
+                if (currentMode === 'erase') {
+                    eraserBtn.classList.add('active');
+                    canvas.style.cursor = 'crosshair';
+                } else if (currentMode === 'text') {
+                    textBtn.classList.add('active');
+                    canvas.style.cursor = 'text';
+
+                    // 检查当前画笔大小，如果小于16px，则为文本工具设置一个更合理的默认值
+                    const currentSize = parseFloat(brushSizeSlider.value);
+                    if (currentSize < 16) {
+                        const newTextSize = 16;
+                        brushSizeSlider.value = newTextSize;
+                        brushSizeValue.textContent = `${newTextSize}px`;
+                    }
+                } else if (currentMode === 'pan') {
+                    panBtn.classList.add('active');
+                    canvas.style.cursor = 'grab';
+                }
+                else { // draw mode (default or explicitly set)
+                    penBtn.classList.add('active'); // Set pen active
+                    canvas.style.cursor = `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'%3e%3c/path%3e%3c/svg%3e") 0 24, crosshair`;
+                }
+            }
+
+            penBtn.addEventListener('click', () => setActiveTool('draw')); // Add event listener
+            eraserBtn.addEventListener('click', () => setActiveTool('erase'));
+            textBtn.addEventListener('click', () => setActiveTool('text'));
+            panBtn.addEventListener('click', () => setActiveTool('pan'));
+            colorPicker.addEventListener('input', () => setActiveTool('draw'));
+
+            clearBtn.addEventListener('click', () => {
+                drawingHistory = [];
+                scale = 1;
+                offsetX = 0;
+                offsetY = 0;
+                redrawCanvas();
+                updateUndoButton();
+            });
+
+            undoBtn.addEventListener('click', () => {
+                if (drawingHistory.length > 0) {
+                    drawingHistory.pop();
+                    redrawCanvas();
+                    updateUndoButton();
+                }
+            });
+
+            window.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                for (const item of items) {
+                    if (item.kind === 'file' && item.type.startsWith('image/')) {
+                        const blob = item.getAsFile();
+                        handleImageUpload(blob);
+                        return;
+                    }
+                }
+            });
+
+            // --- Image Upload Logic ---
+            uploadBtn.addEventListener('click', () => {
+                imageUploadInput.click();
+            });
+
+            imageUploadInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    handleImageUpload(file);
+                    // Reset input so the same file can be selected again if needed
+                    imageUploadInput.value = '';
+                }
+            });
+
+            function handleImageUpload(blob) {
+                if (blob) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const centerPoint = getTransformedPoint(canvas.width / 2, canvas.height / 2);
+                            const imgWidthInWorld = img.width / scale;
+                            const imgHeightInWorld = img.height / scale;
+
+                            drawingHistory.push({
+                                type: 'image',
+                                image: img,
+                                x: centerPoint.x - imgWidthInWorld / 2,
+                                y: centerPoint.y - imgHeightInWorld / 2,
+                                width: imgWidthInWorld,
+                                height: imgHeightInWorld
+                            });
+                            redrawCanvas();
+                            updateUndoButton();
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+
+
+            function resetConfirmButton() {
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3L9.5 8.5L4 11l5.5 2.5L12 19l2.5-5.5L20 11l-5.5-2.5z"></path>
+                    </svg>
+                    <span>Go</span>
+                `;
+            }
+
+            // --- Gemini API and Modal Logic ---
+            confirmBtn.addEventListener('click', async () => {
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = '<span>...</span>';
+
+                finalizeActiveTextarea();
+                const bounds = getDrawingBounds();
+                if (bounds.width <= 0 || bounds.height <= 0) {
+                    return;
+                }
+
+                const padding = 40;
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = bounds.width + padding;
+                tempCanvas.height = bounds.height + padding;
+                const tempCtx = tempCanvas.getContext('2d');
+
+                tempCtx.fillStyle = '#ffffff';
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                tempCtx.save();
+                tempCtx.translate(-bounds.minX + padding / 2, -bounds.minY + padding / 2);
+
+                drawHistoryOnContext(tempCtx, drawingHistory);
+                tempCtx.restore();
+
+                lastImageBytes = tempCanvas.toDataURL('image/jpeg').split(',')[1];
+
+                screenshotImage.src = `data:image/jpeg;base64,${lastImageBytes}`;
+                geminiImage.style.display = 'none';
+                geminiImage.src = '';
+                document.getElementById('video-result-area').style.display = 'none'; // Hide video area
+                document.getElementById('video-container').innerHTML = ''; // Clear previous video
+                document.getElementById('supplementary-notes').style.display = 'none';
+                document.getElementById('supplementary-notes-textarea').value = ''; // Clear supplementary notes
+                document.getElementById('description-style-container').innerHTML = '<div class="loader"></div>';
+                // statusMessage.textContent = ''; // managed by showToast
+                tryAgainBtn.style.display = 'none';
+                imageBtn.style.display = 'none';
+                videoBtn.style.display = 'none';
+                document.getElementById('video-supplementary-notes').style.display = 'none';
+                document.getElementById('video-supplementary-notes').style.display = 'none';
+                saveBtn.style.display = 'none';
+                imageModal.classList.add('show');
+                document.getElementById('logo').style.display = 'none'; // Hide logo when popup shows
+
+                try {
+                    await understandImage(lastImageBytes);
+                } catch (error) {
+                    console.error("API call failed:", error);
+                    document.getElementById('description-style-container').innerHTML = `<p style="color: red; word-wrap: break-word;">抱歉，分析时出现错误: ${error.message}</p>`;
+                } finally {
+                    tryAgainBtn.style.display = 'block';
+                    imageBtn.style.display = 'block';
+                }
+            });
+
+            tryAgainBtn.addEventListener('click', async () => {
+                if (lastImageBytes) {
+                    const supplementaryNotes = document.getElementById('supplementary-notes-textarea').value;
+                    const descriptionContainer = document.getElementById('description-style-container');
+                    descriptionContainer.innerHTML = '<div class="loader"></div>';
+                    descriptionContainer.innerHTML = '<div class="loader"></div>';
+                    geminiImage.style.display = 'none';
+                    document.getElementById('video-result-area').style.display = 'none'; // Hide video area
+                    document.getElementById('video-container').innerHTML = ''; // Clear previous video
+                    document.getElementById('supplementary-notes').style.display = 'none';
+                    tryAgainBtn.style.display = 'none';
+                    imageBtn.style.display = 'none';
+                    videoBtn.style.display = 'none';
+                    document.getElementById('video-supplementary-notes').style.display = 'none';
+                    saveBtn.style.display = 'none';
+                    try {
+                        await understandImage(lastImageBytes, supplementaryNotes);
+                    } catch (error) {
+                        console.error("API call failed:", error);
+                        descriptionContainer.innerHTML = `<p style="color: red; word-wrap: break-word;">抱歉，分析时出现错误: ${error.message}</p>`;
+                    } finally {
+                        tryAgainBtn.style.display = 'block';
+                        imageBtn.style.display = 'block';
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = '保存创作';
+                    }
+                }
+            });
+
+            imageBtn.addEventListener('click', async () => {
+                if (lastImageBytes) {
+                    const generatedContentDiv = document.getElementById('generated-content');
+                    const supplementaryNotes = document.getElementById('supplementary-notes-textarea').value;
+
+                    generatedContentDiv.innerHTML = '<div class="loader"></div>'; // Show loader in the generated content area
+
+                    tryAgainBtn.style.display = 'none';
+                    imageBtn.style.display = 'none';
+                    videoBtn.style.display = 'none';
+                    document.getElementById('video-supplementary-notes').style.display = 'none';
+                    saveBtn.style.display = 'none';
+                    try {
+                        await generateImage(lastImageBytes, supplementaryNotes);
+                    } catch (error) {
+                        console.error("API call failed:", error);
+                        generatedContentDiv.innerHTML = `<p style="color: red; word-wrap: break-word;">抱歉，生成图片时出现错误: ${error.message}</p>`;
+                    } finally {
+                        tryAgainBtn.style.display = 'block';
+                        imageBtn.style.display = 'block';
+                    }
+                }
+            });
+
+            videoBtn.addEventListener('click', async () => {
+                if (lastGeneratedImageBytes && lastCreationId) {
+                    const videoResultArea = document.getElementById('video-result-area');
+                    const videoContainer = document.getElementById('video-container');
+                    const videoNotes = document.getElementById('video-supplementary-notes-textarea').value;
+
+                    videoResultArea.style.display = 'flex'; // Show video area
+                    videoContainer.innerHTML = '<div class="loader"></div>'; // Show loader in the video container
+
+                    tryAgainBtn.style.display = 'none';
+                    imageBtn.style.display = 'none';
+                    videoBtn.style.display = 'none';
+                    document.getElementById('video-supplementary-notes').style.display = 'none';
+                    saveBtn.style.display = 'none'; // Hide save button during video generation
+                    try {
+                        await generateVideo(lastGeneratedImageBytes, lastCreationId, videoNotes);
+                    } catch (error) {
+                        console.error("API call failed:", error);
+                        videoContainer.innerHTML = `<p style="color: red; word-wrap: break-word;">抱歉，生成视频时出现错误: ${error.message}</p>`;
+                    } finally {
+                        tryAgainBtn.style.display = 'block';
+                        imageBtn.style.display = 'block';
+                        videoBtn.style.display = 'block'; // Re-show video button
+                        document.getElementById('video-supplementary-notes').style.display = 'block';
+                        // Only show save button if it hasn't been successfully saved yet
+                        if (!lastCreationId) {
+                            saveBtn.style.display = 'block';
+                        }
+                    }
+                }
+            });
+
+            saveBtn.addEventListener('click', async () => {
+                // statusMessage.textContent = ''; // Managed by showToast
+                // statusMessage.className = 'status-message'; // Managed by showToast
+
+                if (!lastImageBytes || !lastGeneratedImageBytes) {
+                    showToast("没有可保存的图片。", "error");
+                    return;
+                }
+
+                saveBtn.disabled = true;
+                saveBtn.textContent = '保存中...';
+
+                try {
+                    const response = await fetch('/api/save-creation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            drawingData: lastImageBytes,
+                            generatedData: lastGeneratedImageBytes,
+                            prompt: lastImagePrompt,
+                            cn_description: lastCnDescription,
+                            cn_style: lastCnStyle
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorResult = await response.json();
+                        throw new Error(errorResult.message || 'Failed to save creation.');
+                    }
+
+                    const result = await response.json();
+                    lastCreationId = result.creationId; // Store the new creation ID
+
+                    showToast('创作保存成功!', 'success');
+                    showToast('创作保存成功!', 'success');
+                    videoBtn.style.display = 'block'; // Show video button now that we have an ID
+                    document.getElementById('video-supplementary-notes').style.display = 'block';
+                    saveBtn.style.display = 'none'; // Hide save button after saving
+
+                } catch (error) {
+                    console.error('Error saving creation:', error);
+                    showToast(`保存失败: ${error.message}`, 'error');
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '保存创作';
+                }
+            });
+
+            async function understandImage(imageData, supplementaryNotes = '') {
+                const styleSelect = document.getElementById('style-select');
+                const selectedStyle = styleSelect.value;
+                const descriptionContainer = document.getElementById('description-style-container');
+                const supplementaryNotesContainer = document.getElementById('supplementary-notes');
+
+                const response = await fetch('/api/understand', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        imageData: imageData,
+                        style: selectedStyle,
+                        notes: supplementaryNotes
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`API request failed with status: ${response.status}. Body: ${errorBody}`);
+                }
+
+                const result = await response.json();
+                lastImagePrompt = result.image_prompt; // Store image prompt for generation
+                lastVideoPrompt = result.video_prompt; // Store video prompt for generation
+                lastCnDescription = result.cn_description; // Store for saving
+                lastCnStyle = result.cn_style; // Store for saving
+
+                if (result.cn_description && result.cn_style) {
+                    descriptionContainer.innerHTML = `
+                        <div style="text-align: left;">
+                            <h3>绘图理解</h3>
+                            <p>${result.cn_description}</p>
+                            <h3>艺术风格</h3>
+                            <p>${result.cn_style}</p>
+                        </div>
+                    `;
+                } else if (result.error) {
+                } else if (result.error) {
+                    descriptionContainer.innerHTML = `<p style="color: red;">分析失败: ${result.details || result.error}</p>`;
+                }
+                else {
+                    descriptionContainer.innerHTML = `<p style="color: orange;">收到回复，但未找到描述。</p>`;
+                }
+
+                supplementaryNotesContainer.style.display = 'block';
+                geminiImage.style.display = 'none';
+                videoBtn.style.display = 'none';
+                saveBtn.style.display = 'none';
+                lastCreationId = null;
+                lastGeneratedImageBytes = null;
+            }
+
+            async function generateImage(imageData, supplementaryNotes = '') {
+                // Combine existing prompt with supplementary notes
+                let finalPrompt = lastImagePrompt;
+                if (supplementaryNotes && supplementaryNotes.trim() !== '') {
+                    finalPrompt += `\n\nUser also requested: ${supplementaryNotes}`;
+                }
+
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        imageData: imageData,
+                        prompt: finalPrompt,
+                        model: document.getElementById('image-model-select').value
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`API request failed with status: ${response.status}. Body: ${errorBody}`);
+                }
+
+                const result = await response.json();
+                const generatedContentDiv = document.getElementById('generated-content');
+                generatedContentDiv.innerHTML = ''; // Clear loader
+
+                if (result.parts) {
+                    const imagePart = result.parts.find(p => p.inlineData);
+
+                    if (imagePart && imagePart.inlineData && imagePart.inlineData.data) {
+                        lastGeneratedImageBytes = imagePart.inlineData.data; // Store generated image
+                        const mimeType = imagePart.inlineData.mimeType || 'image/jpeg';
+
+                        // The original gemini-image element was removed when we set innerHTML.
+                        // We need to re-create it.
+                        const newImg = document.createElement('img');
+                        newImg.id = 'gemini-image';
+                        newImg.src = `data:${mimeType};base64,${lastGeneratedImageBytes}`;
+                        newImg.alt = 'Gemini Generated Image';
+                        newImg.style.flex = '1';
+                        newImg.style.minWidth = '300px';
+                        newImg.style.maxWidth = '100%';
+                        newImg.style.maxHeight = '400px';
+                        newImg.style.width = 'auto';
+                        newImg.style.height = 'auto';
+                        newImg.style.display = 'block';
+                        newImg.style.objectFit = 'contain';
+                        generatedContentDiv.appendChild(newImg);
+                        geminiImage = newImg; // Update global reference
+
+                        // Note: Video container is now separate, so we don't create it here.
+
+                        saveBtn.style.display = 'block'; // Show Save button
+                        videoBtn.style.display = 'none'; // Hide Video button until saved
+                    } else {
+                        generatedContentDiv.innerHTML = `<p style="color: orange;">图片生成成功，但未返回图片数据。</p>`;
+                    }
+                } else {
+                    throw new Error(`Could not find valid content in the API response. Response: ${JSON.stringify(result)}`);
+                }
+            }
+
+            async function generateVideo(imageData, creationId, supplementaryNotes = '') {
+                const videoContainer = document.getElementById('video-container');
+
+                // Combine existing prompt with supplementary notes
+                let finalPrompt = lastVideoPrompt;
+                if (supplementaryNotes && supplementaryNotes.trim() !== '') {
+                    finalPrompt += `\n\nUser also requested: ${supplementaryNotes}`;
+                }
+
+                // 1. Start the video generation job
+                const startResponse = await fetch('/api/generate-video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        imageData: imageData,
+                        prompt: finalPrompt,
+                        creationId: creationId,
+                        model: document.getElementById('video-model-select').value
+                    })
+                });
+
+                if (!startResponse.ok) {
+                    const errorBody = await startResponse.text();
+                    throw new Error(`Failed to start video generation: ${errorBody}`);
+                }
+
+                const { operationName } = await startResponse.json();
+                if (!operationName) {
+                    throw new Error("Did not receive an operation name from the server.");
+                }
+
+                // 2. Poll for the result
+                const poll = async () => {
+                    const statusResponse = await fetch('/api/video-status', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            operationName: operationName,
+                            creationId: creationId,
+                            prompt: lastVideoPrompt // Pass prompt for saving to Firestore
+                        })
+                    });
+
+                    if (!statusResponse.ok) {
+                        const errorBody = await statusResponse.text();
+                        throw new Error(`Video status check failed: ${errorBody}`);
+                    }
+
+                    const result = await statusResponse.json();
+
+                    if (result.status === 'completed') {
+                        videoContainer.innerHTML = ''; // Clear loader
+                        const videoElement = document.createElement('video');
+                        videoElement.src = result.videoUrl;
+                        videoElement.controls = true;
+                        videoElement.style.maxWidth = '300px';
+                        videoElement.style.maxHeight = 'calc(90vh - 80px)';
+                        videoElement.style.borderRadius = '5px';
+                        videoElement.style.border = '1px solid #eee';
+                        videoContainer.appendChild(videoElement);
+                    } else if (result.status === 'processing') {
+                        setTimeout(poll, 10000); // Poll again after 10 seconds
+                    } else {
+                        throw new Error(`Unknown video status: ${result.status}`);
+                    }
+                };
+
+                await poll(); // Start polling
+            }
+
+            closeModalBtn.addEventListener('click', () => {
+                imageModal.classList.remove('show');
+                resetConfirmButton();
+            });
+
+            imageModal.addEventListener('click', (e) => {
+                if (e.target === imageModal) {
+                    imageModal.classList.remove('show');
+                    resetConfirmButton();
+                }
+            });
+
+            // --- User Info Logic ---
+            async function fetchUserInfo() {
+                try {
+                    const response = await fetch('/api/user');
+                    // If 401 unauthenticated, treat as guest
+                    if (response.status === 401) {
+                        userEmailSpan.textContent = 'guest@example.com';
+                        userIdSpan.textContent = 'guest';
+                        userProfile.style.display = 'block';
+                        logoutBtn.style.display = 'none';
+                        loginBtn.style.display = 'block';
+                        return;
+                    }
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch user info: ${response.status}`);
+                    }
+                    const userData = await response.json();
+                    userEmailSpan.textContent = userData.email;
+                    userIdSpan.textContent = userData.id;
+                    userProfile.style.display = 'block';
+
+                    if (userData.id === 'guest') {
+                        logoutBtn.style.display = 'none';
+                        loginBtn.style.display = 'block';
+                        saveBtn.style.display = 'none';
+                        videoBtn.style.display = 'none';
+                        document.getElementById('video-supplementary-notes').style.display = 'none';
+                    } else {
+                        logoutBtn.style.display = 'block';
+                        loginBtn.style.display = 'none';
+                        saveBtn.style.display = 'block';
+                        saveBtn.textContent = '保存创作';
+                        saveBtn.disabled = false;
+                        videoBtn.style.display = 'none'; // Hide Video button until saved
+                        document.getElementById('video-supplementary-notes').style.display = 'none';
+                    }
+                } catch (error) {
+                    console.error('Error fetching user info:', error);
+                    // Fallback to guest on error
+                    userEmailSpan.textContent = 'guest@example.com';
+                    userIdSpan.textContent = 'guest';
+                    userProfile.style.display = 'block';
+                    logoutBtn.style.display = 'none';
+                    loginBtn.style.display = 'block';
+                }
+            }
+
+            userIcon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isShown = userInfoPopup.style.display === 'block';
+                userInfoPopup.style.display = isShown ? 'none' : 'block';
+            });
+
+            document.addEventListener('click', (e) => {
+                if (userProfile.style.display === 'block' && !userProfile.contains(e.target)) {
+                    userInfoPopup.style.display = 'none';
+                }
+            });
+
+            logoutBtn.addEventListener('click', () => {
+                window.location.href = '/_gcp_iap/clear_login_cookie';
+            });
+
+            loginBtn.addEventListener('click', () => {
+                try {
+                    console.log('Login button clicked');
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('gcp-iap-mode', 'FORCE_LOGIN');
+                    window.location.href = url.toString();
+                } catch (e) {
+                    console.error('Login Error:', e);
+                    alert('Login failed: ' + e.message);
+                }
+            });
+
+            // --- Creations Modal Logic ---
+            creationsBtn.addEventListener('click', async () => {
+                try {
+                    console.log('Creations button clicked');
+                    creationsGrid.innerHTML = '<div class="loader"></div>';
+                    creationsModal.classList.add('show');
+                    userInfoPopup.style.display = 'none';
+
+                    const response = await fetch('/api/creations');
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(`Failed to fetch creations: ${response.status} ${errText}`);
+                    }
+                    const creations = await response.json();
+                    creationsGrid.innerHTML = ''; // Clear loader
+
+                    if (creations.length === 0) {
+                        creationsGrid.innerHTML = '<p>No creations found.</p>';
+                        return;
+                    }
+
+                    creations.forEach(creation => {
+                        const item = document.createElement('div');
+                        item.className = 'creation-item';
+                        item.dataset.creationId = creation.id;
+
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'selection-checkbox';
+                        checkbox.dataset.creationId = creation.id;
+                        item.appendChild(checkbox);
+
+                        const drawingImg = document.createElement('img');
+                        drawingImg.src = creation.drawingUrl;
+                        drawingImg.alt = 'User Drawing';
+
+                        const generatedImg = document.createElement('img');
+                        generatedImg.src = creation.imageUrl;
+                        generatedImg.alt = 'Generated Image';
+
+                        item.appendChild(drawingImg);
+                        item.appendChild(generatedImg);
+
+                        if (creation.videoUrl) {
+                            const videoElement = document.createElement('video');
+                            videoElement.src = creation.videoUrl;
+                            videoElement.controls = true;
+                            videoElement.style.width = '100%';
+                            item.appendChild(videoElement);
+                        }
+
+                        const idText = document.createElement('p');
+                        idText.textContent = `ID: ${creation.id}`;
+
+                        const timestampText = document.createElement('p');
+                        timestampText.textContent = new Date(creation.timestamp).toLocaleString();
+
+                        item.appendChild(idText);
+                        item.appendChild(timestampText);
+                        creationsGrid.appendChild(item);
+                    });
+
+                } catch (error) {
+                    console.error('Error fetching creations:', error);
+                    creationsGrid.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                }
+            });
+
+            closeCreationsModalBtn.addEventListener('click', () => {
+                creationsModal.classList.remove('show');
+            });
+
+            creationsModal.addEventListener('click', (e) => {
+                if (e.target === creationsModal) {
+                    creationsModal.classList.remove('show');
+                }
+            });
+
+            function getSelectedCreationIds() {
+                return Array.from(creationsGrid.querySelectorAll('.selection-checkbox:checked'))
+                    .map(cb => cb.dataset.creationId);
+            }
+
+            function updateTotalSelection() {
+                const selectedIds = getSelectedCreationIds();
+                deleteCreationsBtn.disabled = selectedIds.length === 0;
+
+                const allCheckboxes = creationsGrid.querySelectorAll('.selection-checkbox');
+                selectAllCheckbox.checked = allCheckboxes.length > 0 && selectedIds.length === allCheckboxes.length;
+            }
+
+            creationsGrid.addEventListener('change', (e) => {
+                if (e.target.classList.contains('selection-checkbox')) {
+                    updateTotalSelection();
+                }
+            });
+
+            selectAllCheckbox.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                creationsGrid.querySelectorAll('.selection-checkbox').forEach(cb => {
+                    cb.checked = isChecked;
+                });
+                updateTotalSelection();
+            });
+
+            deleteCreationsBtn.addEventListener('click', async () => {
+                const creationIds = getSelectedCreationIds();
+                if (creationIds.length === 0 || !confirm(`确认删除 ${creationIds.length} 个作品吗?`)) {
+                    return;
+                }
+
+                deleteCreationsBtn.disabled = true;
+                deleteCreationsBtn.textContent = '删除中...';
+
+                try {
+                    const response = await fetch('/api/creations', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ creationIds })
+                    });
+
+                    if (!response.ok) {
+                        const errorResult = await response.json();
+                        throw new Error(errorResult.message || 'Failed to delete creations.');
+                    }
+
+                    // Remove deleted items from the UI
+                    creationIds.forEach(id => {
+                        const itemToRemove = creationsGrid.querySelector(`.creation-item[data-creation-id="${id}"]`);
+                        if (itemToRemove) {
+                            itemToRemove.remove();
+                        }
+                    });
+
+                } catch (error) {
+                    console.error('Error deleting creations:', error);
+                    showToast(`删除失败: ${error.message}`, 'error');
+                } finally {
+                    deleteCreationsBtn.textContent = '删除选中';
+                    updateTotalSelection();
+                }
+            });
+
+            closeModalBtn.addEventListener('click', () => {
+                imageModal.classList.remove('show');
+                document.getElementById('logo').style.display = 'block'; // Show logo
+            });
+
+            window.addEventListener('click', (e) => {
+                if (e.target === imageModal) {
+                    imageModal.classList.remove('show');
+                    document.getElementById('logo').style.display = 'block'; // Show logo
+                }
+                if (e.target === creationsModal) {
+                    creationsModal.classList.remove('show');
+                }
+            });
+
+            // --- Lightbox Logic ---
+            const lightbox = document.getElementById('lightbox');
+            const lightboxContent = document.getElementById('lightbox-content');
+            const lightboxClose = document.getElementById('lightbox-close');
+
+            function openLightbox(element) {
+                lightboxContent.innerHTML = '';
+                let clone;
+                if (element.tagName === 'IMG') {
+                    clone = element.cloneNode();
+                } else if (element.tagName === 'VIDEO') {
+                    clone = element.cloneNode(true);
+                    clone.controls = true;
+                    clone.autoplay = true;
+                }
+
+                if (clone) {
+                    lightboxContent.appendChild(clone);
+                    lightbox.style.display = 'flex';
+                }
+            }
+
+            lightboxClose.addEventListener('click', () => {
+                lightbox.style.display = 'none';
+                const video = lightboxContent.querySelector('video');
+                if (video) video.pause();
+            });
+
+            lightbox.addEventListener('click', (e) => {
+                if (e.target === lightbox) {
+                    lightbox.style.display = 'none';
+                    const video = lightboxContent.querySelector('video');
+                    if (video) video.pause();
+                }
+            });
+
+            // Add double click listeners
+            screenshotImage.addEventListener('dblclick', () => openLightbox(screenshotImage));
+
+            // Validation: Event Delegation for dynamic content
+            document.getElementById('generated-content').addEventListener('dblclick', (e) => {
+                if (e.target.tagName === 'IMG') {
+                    openLightbox(e.target);
+                }
+            });
+
+            // For video, we need to bind to the container or handle dynamic video element
+            // Since video is created dynamically, we can delegate or just attach to container
+            // We verify the container exists before attaching
+            const videoContainer = document.getElementById('video-container');
+            if (videoContainer) {
+                videoContainer.addEventListener('dblclick', (e) => {
+                    if (e.target.tagName === 'VIDEO') {
+                        openLightbox(e.target);
+                    }
+                });
+            }
+
+
+            // Initial render
+            fetchUserInfo().catch(console.error); // Start user info fetch non-blocking
+            resizeCanvas();
+            updateUndoButton();
+        });
+    </script>
+</body>
